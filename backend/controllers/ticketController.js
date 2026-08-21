@@ -1,5 +1,4 @@
 const Ticket = require("../models/Ticket");
-const { analyzeTicket } = require("../services/aiService");
 
 // Create a ticket
 const createTicket = async (req, res) => {
@@ -45,50 +44,13 @@ const getTickets = async (req, res) => {
   }
 };
 
-// Analyze ticket using AI
-const analyzeTicketWithAI = async (req, res) => {
-  try {
-    const ticket = await Ticket.findById(req.params.id);
-
-    if (!ticket) {
-      return res.status(404).json({
-        success: false,
-        message: "Ticket not found",
-      });
-    }
-
-    const analysis = await analyzeTicket(
-      ticket.title,
-      ticket.description
-    );
-
-    ticket.aiAnalysis = {
-      ...analysis,
-      analyzedAt: new Date(),
-    };
-
-    await ticket.save();
-
-    res.json({
-      success: true,
-      message: "Ticket analyzed successfully",
-      analysis,
-    });
-  } catch (error) {
-    console.error("AI analysis error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to analyze ticket",
-      error: error.message,
-    });
-  }
-};
 // Update a ticket
 const updateTicket = async (req, res) => {
   try {
+    const { id } = req.params;
+
     const ticket = await Ticket.findByIdAndUpdate(
-      req.params.id,
+      id,
       req.body,
       {
         new: true,
@@ -116,11 +78,12 @@ const updateTicket = async (req, res) => {
     });
   }
 };
-
 // Delete a ticket
 const deleteTicket = async (req, res) => {
   try {
-    const ticket = await Ticket.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+
+    const ticket = await Ticket.findByIdAndDelete(id);
 
     if (!ticket) {
       return res.status(404).json({
@@ -132,6 +95,7 @@ const deleteTicket = async (req, res) => {
     res.json({
       success: true,
       message: "Ticket deleted successfully",
+      ticket,
     });
   } catch (error) {
     res.status(500).json({
@@ -145,7 +109,6 @@ const deleteTicket = async (req, res) => {
 module.exports = {
   createTicket,
   getTickets,
-  analyzeTicketWithAI,
   updateTicket,
   deleteTicket,
 };
