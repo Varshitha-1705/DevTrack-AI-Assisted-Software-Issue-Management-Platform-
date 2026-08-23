@@ -4,17 +4,34 @@ require("dotenv").config({ override: true });
 
 const connectDB = require("./config/db");
 const ticketRoutes = require("./routes/ticketRoutes");
+const authRoutes = require("./routes/authRoutes");
+const protect = require("./middleware/authMiddleware");
 
 const app = express();
 
-// Middleware
+// =========================
+// MIDDLEWARE
+// =========================
+
 app.use(cors());
 app.use(express.json());
 
-// Connect MongoDB
+// =========================
+// AUTH ROUTES
+// =========================
+
+app.use("/api/auth", authRoutes);
+
+// =========================
+// CONNECT MONGODB
+// =========================
+
 connectDB();
 
-// Health check
+// =========================
+// HEALTH CHECK
+// =========================
+
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,
@@ -22,8 +39,27 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Ticket routes
+// =========================
+// PROTECTED TEST ROUTE
+// =========================
+
+app.get("/api/auth/me", protect, (req, res) => {
+  res.json({
+    success: true,
+    message: "Authentication successful",
+    user: req.user,
+  });
+});
+
+// =========================
+// TICKET ROUTES
+// =========================
+
 app.use("/api/tickets", ticketRoutes);
+
+// =========================
+// START SERVER
+// =========================
 
 const PORT = process.env.PORT || 5000;
 

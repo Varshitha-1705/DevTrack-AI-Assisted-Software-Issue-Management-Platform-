@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Login from "./Login";
 
 interface AIAnalysis {
   category: string;
@@ -24,9 +25,22 @@ interface Ticket {
 }
 
 function App() {
+  // =========================
+  // AUTH
+  // =========================
+
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    !!localStorage.getItem("token")
+  );
+
+  // =========================
+  // TICKETS
+  // =========================
+
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [selectedTicket, setSelectedTicket] =
+    useState<Ticket | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -40,14 +54,47 @@ function App() {
   });
 
   // =========================
+  // LOGOUT
+  // =========================
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setIsLoggedIn(false);
+    setTickets([]);
+    setSelectedTicket(null);
+  };
+
+  // =========================
+  // AUTH HEADER
+  // =========================
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("token");
+
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+  };
+
+  // =========================
   // FETCH TICKETS
   // =========================
 
   const fetchTickets = async () => {
     try {
       const response = await fetch(
-        "http://localhost:5000/api/tickets"
+        "http://localhost:5000/api/tickets",
+        {
+          method: "GET",
+          headers: getAuthHeaders(),
+        }
       );
+
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to fetch tickets");
@@ -63,9 +110,15 @@ function App() {
     }
   };
 
+  // =========================
+  // LOAD TICKETS AFTER LOGIN
+  // =========================
+
   useEffect(() => {
-    fetchTickets();
-  }, []);
+    if (isLoggedIn) {
+      fetchTickets();
+    }
+  }, [isLoggedIn]);
 
   // =========================
   // CREATE TICKET
@@ -76,7 +129,10 @@ function App() {
   ) => {
     e.preventDefault();
 
-    if (!form.title.trim() || !form.description.trim()) {
+    if (
+      !form.title.trim() ||
+      !form.description.trim()
+    ) {
       alert("Please enter title and description.");
       return;
     }
@@ -88,36 +144,48 @@ function App() {
         "http://localhost:5000/api/tickets",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify(form),
         }
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to create ticket");
+      if (response.status === 401) {
+        handleLogout();
+        return;
       }
 
       const data = await response.json();
 
-      if (data.success) {
-        setTickets((prev) => [data.ticket, ...prev]);
-
-        setForm({
-          title: "",
-          description: "",
-          category: "bug",
-          severity: "medium",
-        });
-
-        setShowCreateModal(false);
-      } else {
-        alert(data.message || "Failed to create ticket.");
+      if (!response.ok || !data.success) {
+        alert(
+          data.message ||
+            "Failed to create ticket."
+        );
+        return;
       }
+
+      setTickets((prev) => [
+        data.ticket,
+        ...prev,
+      ]);
+
+      setForm({
+        title: "",
+        description: "",
+        category: "bug",
+        severity: "medium",
+      });
+
+      setShowCreateModal(false);
     } catch (error) {
-      console.error("Create ticket error:", error);
-      alert("Cannot connect to backend.");
+      console.error(
+        "Create ticket error:",
+        error
+      );
+
+      alert(
+        "Cannot connect to backend."
+      );
     } finally {
       setLoading(false);
     }
@@ -127,7 +195,9 @@ function App() {
   // AI ANALYSIS
   // =========================
 
-  const analyzeTicket = async (ticket: Ticket) => {
+  const analyzeTicket = async (
+    ticket: Ticket
+  ) => {
     try {
       setAnalyzing(true);
 
@@ -135,15 +205,18 @@ function App() {
         `http://localhost:5000/api/tickets/${ticket._id}/analyze`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: getAuthHeaders(),
         }
       );
 
       const data = await response.json();
 
       console.log("AI response:", data);
+
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
 
       if (!response.ok || !data.success) {
         alert(
@@ -153,28 +226,14 @@ function App() {
         return;
       }
 
-      /*
-        Supports both possible backend responses:
-
-        {
-          success: true,
-          analysis: {...}
-        }
-
-        OR
-
-        {
-          success: true,
-          ticket: {...}
-        }
-      */
-
       const analysis: AIAnalysis =
         data.analysis ||
         data.ticket?.aiAnalysis;
 
       if (!analysis) {
-        alert("AI analysis response was empty.");
+        alert(
+          "AI analysis response was empty."
+        );
         return;
       }
 
@@ -184,13 +243,16 @@ function App() {
         aiAnalysis: analysis,
 
         category:
-          analysis.category || ticket.category,
+          analysis.category ||
+          ticket.category,
 
         severity:
-          analysis.severity || ticket.severity,
+          analysis.severity ||
+          ticket.severity,
 
         priority:
-          analysis.priority || ticket.priority,
+          analysis.priority ||
+          ticket.priority,
 
         assignedTo:
           analysis.suggestedTeam ||
@@ -206,9 +268,11 @@ function App() {
       );
 
       setSelectedTicket(updatedTicket);
-
     } catch (error) {
-      console.error("AI analysis error:", error);
+      console.error(
+        "AI analysis error:",
+        error
+      );
 
       alert(
         "Unable to connect to AI service. Make sure your backend and AI service are running."
@@ -233,14 +297,17 @@ function App() {
         `http://localhost:5000/api/tickets/${ticketId}`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify(updates),
         }
       );
 
       const data = await response.json();
+
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
 
       if (!response.ok || !data.success) {
         alert(
@@ -259,14 +326,15 @@ function App() {
       );
 
       setSelectedTicket(data.ticket);
-
     } catch (error) {
       console.error(
         "Update ticket error:",
         error
       );
 
-      alert("Failed to update ticket.");
+      alert(
+        "Failed to update ticket."
+      );
     } finally {
       setUpdating(false);
     }
@@ -279,21 +347,30 @@ function App() {
   const deleteTicket = async (
     ticketId: string
   ) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this ticket?"
-    );
+    const confirmDelete =
+      window.confirm(
+        "Are you sure you want to delete this ticket?"
+      );
 
-    if (!confirmDelete) return;
+    if (!confirmDelete) {
+      return;
+    }
 
     try {
       const response = await fetch(
         `http://localhost:5000/api/tickets/${ticketId}`,
         {
           method: "DELETE",
+          headers: getAuthHeaders(),
         }
       );
 
       const data = await response.json();
+
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
 
       if (!response.ok || !data.success) {
         alert(
@@ -311,14 +388,15 @@ function App() {
       );
 
       setSelectedTicket(null);
-
     } catch (error) {
       console.error(
         "Delete ticket error:",
         error
       );
 
-      alert("Failed to delete ticket.");
+      alert(
+        "Failed to delete ticket."
+      );
     }
   };
 
@@ -326,17 +404,20 @@ function App() {
   // STATS
   // =========================
 
-  const totalTickets = tickets.length;
+  const totalTickets =
+    tickets.length;
 
-  const openTickets = tickets.filter(
-    (ticket) =>
-      ticket.status === "open"
-  ).length;
+  const openTickets =
+    tickets.filter(
+      (ticket) =>
+        ticket.status === "open"
+    ).length;
 
-  const progressTickets = tickets.filter(
-    (ticket) =>
-      ticket.status === "in-progress"
-  ).length;
+  const progressTickets =
+    tickets.filter(
+      (ticket) =>
+        ticket.status === "in-progress"
+    ).length;
 
   const highPriorityTickets =
     tickets.filter(
@@ -346,7 +427,21 @@ function App() {
     ).length;
 
   // =========================
-  // UI
+  // LOGIN SCREEN
+  // =========================
+
+  if (!isLoggedIn) {
+    return (
+      <Login
+        onLogin={() =>
+          setIsLoggedIn(true)
+        }
+      />
+    );
+  }
+
+  // =========================
+  // MAIN UI
   // =========================
 
   return (
@@ -356,30 +451,30 @@ function App() {
 
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
 
-        {Array.from({ length: 80 }).map(
-          (_, i) => (
-            <span
-              key={i}
-              className={`particle ${
-                i % 3 === 0
-                  ? "white"
-                  : ""
-              }`}
-              style={{
-                left: `${(i * 37) % 100}%`,
-                top: `${(i * 61) % 100}%`,
-                animationDelay: `${
-                  (i % 7) * 0.8
-                }s`,
-                animationDuration: `${
-                  4 + (i % 5)
-                }s`,
-              }}
-            />
-          )
-        )}
+        {Array.from({
+          length: 80,
+        }).map((_, i) => (
+          <span
+            key={i}
+            className={`particle ${
+              i % 3 === 0
+                ? "white"
+                : ""
+            }`}
+            style={{
+              left: `${(i * 37) % 100}%`,
+              top: `${(i * 61) % 100}%`,
+              animationDelay: `${
+                (i % 7) * 0.8
+              }s`,
+              animationDuration: `${
+                4 + (i % 5)
+              }s`,
+            }}
+          />
+        ))}
 
-        <div className="absolute left-1/2 top-1/3 h-125 w-125 -translate-x-1/2 rounded-full bg-green-500/5 blur-[150px]" />
+        <div className="absolute left-1/2 top-1/3 h-96 w-96 -translate-x-1/2 rounded-full bg-green-500/5 blur-[150px]" />
 
       </div>
 
@@ -400,18 +495,30 @@ function App() {
             </h1>
 
             <p className="text-sm text-gray-500">
-              AI-Powered Software Issue Management
+              AI-Powered Software Issue
+              Management
             </p>
           </div>
 
-          <button
-            onClick={() =>
-              setShowCreateModal(true)
-            }
-            className="rounded-xl border border-green-400/30 bg-green-400/10 px-5 py-2.5 text-sm font-medium text-green-400 transition-all duration-300 hover:border-green-400/60 hover:bg-green-400/20 hover:shadow-[0_0_25px_rgba(34,197,94,0.2)]"
-          >
-            + Create Ticket
-          </button>
+          <div className="flex items-center gap-3">
+
+            <button
+              onClick={handleLogout}
+              className="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-2.5 text-sm text-red-400 transition hover:bg-red-400/20"
+            >
+              Logout
+            </button>
+
+            <button
+              onClick={() =>
+                setShowCreateModal(true)
+              }
+              className="rounded-xl border border-green-400/30 bg-green-400/10 px-5 py-2.5 text-sm font-medium text-green-400 transition-all duration-300 hover:border-green-400/60 hover:bg-green-400/20 hover:shadow-[0_0_25px_rgba(34,197,94,0.2)]"
+            >
+              + Create Ticket
+            </button>
+
+          </div>
 
         </nav>
 
@@ -426,6 +533,7 @@ function App() {
           <h2 className="text-5xl font-bold tracking-tight md:text-6xl">
             Track. Analyze.
             <br />
+
             <span className="text-green-400">
               Resolve.
             </span>
@@ -433,9 +541,9 @@ function App() {
 
           <p className="mt-5 max-w-xl text-gray-500">
             Manage software issues,
-            prioritize bugs and let AI help
-            your engineering team resolve
-            problems faster.
+            prioritize bugs and let AI
+            help your engineering team
+            resolve problems faster.
           </p>
 
         </section>
@@ -445,10 +553,22 @@ function App() {
         <section className="mb-10 grid gap-4 md:grid-cols-4">
 
           {[
-            ["Total Tickets", totalTickets],
-            ["Open", openTickets],
-            ["In Progress", progressTickets],
-            ["High Priority", highPriorityTickets],
+            [
+              "Total Tickets",
+              totalTickets,
+            ],
+            [
+              "Open",
+              openTickets,
+            ],
+            [
+              "In Progress",
+              progressTickets,
+            ],
+            [
+              "High Priority",
+              highPriorityTickets,
+            ],
           ].map(
             ([label, value]) => (
               <div
@@ -479,13 +599,16 @@ function App() {
           <div className="mb-5 flex items-center justify-between">
 
             <div>
+
               <h3 className="text-2xl font-semibold">
                 Recent Tickets
               </h3>
 
               <p className="mt-1 text-sm text-gray-500">
-                Your software issues at a glance
+                Your software issues at
+                a glance
               </p>
+
             </div>
 
             <button
@@ -510,8 +633,9 @@ function App() {
               </h4>
 
               <p className="mt-2 text-sm text-gray-500">
-                Create your first software
-                issue to get started.
+                Create your first
+                software issue to get
+                started.
               </p>
 
             </div>
@@ -526,7 +650,9 @@ function App() {
                   <button
                     key={ticket._id}
                     onClick={() =>
-                      setSelectedTicket(ticket)
+                      setSelectedTicket(
+                        ticket
+                      )
                     }
                     className="group w-full rounded-2xl border border-white/10 bg-white/[0.035] p-6 text-left backdrop-blur-xl transition-all duration-300 hover:border-green-400/30 hover:bg-white/5 hover:shadow-[0_10px_40px_rgba(34,197,94,0.05)]"
                   >
@@ -583,7 +709,8 @@ function App() {
         {/* FOOTER */}
 
         <footer className="mt-16 border-t border-white/5 py-6 text-center text-xs text-gray-600">
-          DevTrack • AI-Powered Software Issue Management
+          DevTrack • AI-Powered Software
+          Issue Management
         </footer>
 
       </main>
@@ -599,6 +726,7 @@ function App() {
             <div className="mb-7 flex items-center justify-between">
 
               <div>
+
                 <p className="text-xs uppercase tracking-[0.25em] text-green-400">
                   New Issue
                 </p>
@@ -606,6 +734,7 @@ function App() {
                 <h2 className="mt-1 text-2xl font-semibold">
                   Create Ticket
                 </h2>
+
               </div>
 
               <button
@@ -637,7 +766,8 @@ function App() {
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      title: e.target.value,
+                      title:
+                        e.target.value,
                     })
                   }
                   className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-green-400/50"
@@ -654,11 +784,14 @@ function App() {
                 <textarea
                   rows={4}
                   placeholder="Describe the issue..."
-                  value={form.description}
+                  value={
+                    form.description
+                  }
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      description: e.target.value,
+                      description:
+                        e.target.value,
                     })
                   }
                   className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-green-400/50"
@@ -675,21 +808,38 @@ function App() {
                   </label>
 
                   <select
-                    value={form.category}
+                    value={
+                      form.category
+                    }
                     onChange={(e) =>
                       setForm({
                         ...form,
-                        category: e.target.value,
+                        category:
+                          e.target.value,
                       })
                     }
                     className="w-full rounded-xl border border-white/10 bg-[#0b0d0c] px-4 py-3 text-sm text-white outline-none focus:border-green-400/50"
                   >
-                    <option value="bug">Bug</option>
-                    <option value="feature">Feature</option>
-                    <option value="improvement">
-                      Improvement
+                    <option value="bug">
+                      Bug
                     </option>
-                    <option value="security">Security</option>
+
+                    <option value="feature">
+                      Feature
+                    </option>
+
+                    <option value="security">
+                      Security
+                    </option>
+
+                    <option value="performance">
+                      Performance
+                    </option>
+
+                    <option value="other">
+                      Other
+                    </option>
+
                   </select>
 
                 </div>
@@ -701,21 +851,35 @@ function App() {
                   </label>
 
                   <select
-                    value={form.severity}
+                    value={
+                      form.severity
+                    }
                     onChange={(e) =>
                       setForm({
                         ...form,
-                        severity: e.target.value,
+                        severity:
+                          e.target.value,
                       })
                     }
                     className="w-full rounded-xl border border-white/10 bg-[#0b0d0c] px-4 py-3 text-sm text-white outline-none focus:border-green-400/50"
                   >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
+
+                    <option value="low">
+                      Low
+                    </option>
+
+                    <option value="medium">
+                      Medium
+                    </option>
+
+                    <option value="high">
+                      High
+                    </option>
+
                     <option value="critical">
                       Critical
                     </option>
+
                   </select>
 
                 </div>
@@ -727,7 +891,9 @@ function App() {
                 <button
                   type="button"
                   onClick={() =>
-                    setShowCreateModal(false)
+                    setShowCreateModal(
+                      false
+                    )
                   }
                   className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-400 transition hover:bg-white/10 hover:text-white"
                 >
@@ -798,7 +964,9 @@ function App() {
               </p>
 
               <p className="leading-7 text-gray-300">
-                {selectedTicket.description}
+                {
+                  selectedTicket.description
+                }
               </p>
 
             </div>
@@ -809,12 +977,16 @@ function App() {
 
               <InfoCard
                 label="Category"
-                value={selectedTicket.category}
+                value={
+                  selectedTicket.category
+                }
               />
 
               <InfoCard
                 label="Severity"
-                value={selectedTicket.severity}
+                value={
+                  selectedTicket.severity
+                }
               />
 
               <InfoCard
@@ -827,7 +999,9 @@ function App() {
 
               <InfoCard
                 label="Status"
-                value={selectedTicket.status}
+                value={
+                  selectedTicket.status
+                }
               />
 
             </div>
@@ -852,7 +1026,9 @@ function App() {
 
                 <button
                   onClick={() =>
-                    analyzeTicket(selectedTicket)
+                    analyzeTicket(
+                      selectedTicket
+                    )
                   }
                   disabled={analyzing}
                   className="rounded-xl border border-green-400/30 bg-green-400/10 px-4 py-2 text-sm text-green-400 transition hover:bg-green-400/20 disabled:opacity-50"
@@ -906,7 +1082,8 @@ function App() {
                       label="AI Category"
                       value={
                         selectedTicket
-                          .aiAnalysis.category
+                          .aiAnalysis
+                          .category
                       }
                     />
 
@@ -914,7 +1091,8 @@ function App() {
                       label="AI Severity"
                       value={
                         selectedTicket
-                          .aiAnalysis.severity
+                          .aiAnalysis
+                          .severity
                       }
                     />
 
@@ -922,17 +1100,22 @@ function App() {
                       label="AI Priority"
                       value={
                         selectedTicket
-                          .aiAnalysis.priority
+                          .aiAnalysis
+                          .priority
                       }
                     />
 
                   </div>
 
-                  {selectedTicket.aiAnalysis.analyzedAt && (
+                  {selectedTicket
+                    .aiAnalysis
+                    .analyzedAt && (
                     <p className="text-xs text-gray-600">
                       Analyzed:{" "}
                       {new Date(
-                        selectedTicket.aiAnalysis.analyzedAt
+                        selectedTicket
+                          .aiAnalysis
+                          .analyzedAt
                       ).toLocaleString()}
                     </p>
                   )}
@@ -944,11 +1127,14 @@ function App() {
                 <div className="rounded-xl border border-white/10 bg-black/20 p-5 text-center">
 
                   <p className="text-sm text-gray-500">
-                    This ticket has not been analyzed yet.
+                    This ticket has not
+                    been analyzed yet.
                   </p>
 
                   <p className="mt-1 text-xs text-gray-600">
-                    Click Analyze to let DevTrack AI inspect the issue.
+                    Click Analyze to let
+                    DevTrack AI inspect
+                    the issue.
                   </p>
 
                 </div>
@@ -968,13 +1154,16 @@ function App() {
                 </label>
 
                 <select
-                  value={selectedTicket.status}
+                  value={
+                    selectedTicket.status
+                  }
                   disabled={updating}
                   onChange={(e) =>
                     updateTicket(
                       selectedTicket._id,
                       {
-                        status: e.target.value,
+                        status:
+                          e.target.value,
                       }
                     )
                   }
@@ -1009,7 +1198,8 @@ function App() {
 
                 <select
                   value={
-                    selectedTicket.assignedTo || ""
+                    selectedTicket.assignedTo ||
+                    ""
                   }
                   disabled={updating}
                   onChange={(e) =>
@@ -1017,7 +1207,8 @@ function App() {
                       selectedTicket._id,
                       {
                         assignedTo:
-                          e.target.value || null,
+                          e.target.value ||
+                          null,
                       }
                     )
                   }
@@ -1117,3 +1308,4 @@ function InfoCard({
 }
 
 export default App;
+

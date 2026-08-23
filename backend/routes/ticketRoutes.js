@@ -5,17 +5,16 @@ const {
   getTickets,
   updateTicket,
   deleteTicket,
-  analyzeTicket,
 } = require("../controllers/ticketController");
+
+const protect = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-router.post("/", createTicket);
-router.get("/", getTickets);
-
-router.post("/:id/analyze", analyzeTicket);
-
-router.put("/:id", updateTicket);
-router.delete("/:id", deleteTicket);
+// Protected ticket routes
+router.post("/", protect, createTicket);
+router.get("/", protect, getTickets);
+router.put("/:id", protect, updateTicket);
+router.delete("/:id", protect, deleteTicket);
 
 module.exports = router;
