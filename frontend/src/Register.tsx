@@ -1,22 +1,24 @@
 import { useState, type FormEvent } from "react";
 
-interface LoginProps {
-  onLogin: () => void;
-  onRegisterClick: () => void;
+interface RegisterProps {
+  onRegister: () => void;
+  onLoginClick: () => void;
 }
 
-function Login({ onLogin, onRegisterClick }: LoginProps) {
+function Register({ onRegister, onLoginClick }: RegisterProps) {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("developer");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
 
-    if (!email.trim() || !password.trim()) {
-      setError("Please enter email and password.");
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      setError("Please fill in all fields.");
       return;
     }
 
@@ -29,38 +31,51 @@ function Login({ onLogin, onRegisterClick }: LoginProps) {
       setLoading(true);
 
       const response = await fetch(
-        "http://localhost:5000/api/auth/login",
+        "http://localhost:5000/api/auth/register",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            name: name.trim(),
             email: email.trim(),
             password,
+            role,
           }),
         }
       );
 
       const data = await response.json();
 
-      console.log("Login response:", data);
+      console.log("Register response:", data);
 
       if (!response.ok || !data.success) {
-        setError(data.message || "Login failed.");
+        if (
+          data.message?.toLowerCase().includes("already") ||
+          data.message?.toLowerCase().includes("exists")
+        ) {
+          setError(
+            "An account with this email already exists. Please login instead."
+          );
+        } else {
+          setError(data.message || "Registration failed.");
+        }
+
         return;
       }
 
-      if (!data.token) {
-        setError("Login successful, but no token was received.");
-        return;
-      }
+      alert("Registration successful! Please login.");
 
-      localStorage.setItem("token", data.token);
+      setName("");
+      setEmail("");
+      setPassword("");
+      setRole("developer");
 
-      onLogin();
+      onRegister();
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("Registration error:", error);
+
       setError(
         "Cannot connect to backend. Make sure your backend is running on port 5000."
       );
@@ -72,10 +87,10 @@ function Login({ onLogin, onRegisterClick }: LoginProps) {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black px-4 text-white">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        {Array.from({ length: 80 }).map((_, i) => (
+        {Array.from({ length: 60 }).map((_, i) => (
           <span
             key={i}
-            className={`particle ${i % 3 === 0 ? "white" : ""}`}
+            className={`particle ${i % 4 === 0 ? "white" : ""}`}
             style={{
               left: `${(i * 37) % 100}%`,
               top: `${(i * 61) % 100}%`,
@@ -100,10 +115,10 @@ function Login({ onLogin, onRegisterClick }: LoginProps) {
         </div>
 
         <div className="mb-6">
-          <h2 className="text-2xl font-semibold">Welcome back</h2>
+          <h2 className="text-2xl font-semibold">Create account</h2>
 
           <p className="mt-1 text-sm text-gray-500">
-            Sign in to continue to DevTrack
+            Register to start using DevTrack
           </p>
         </div>
 
@@ -113,7 +128,22 @@ function Login({ onLogin, onRegisterClick }: LoginProps) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleRegister} className="space-y-5">
+          <div>
+            <label className="mb-2 block text-sm text-gray-400">
+              Name
+            </label>
+
+            <input
+              type="text"
+              placeholder="Enter your name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoComplete="name"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-green-400/50"
+            />
+          </div>
+
           <div>
             <label className="mb-2 block text-sm text-gray-400">
               Email
@@ -121,9 +151,9 @@ function Login({ onLogin, onRegisterClick }: LoginProps) {
 
             <input
               type="email"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
               autoComplete="email"
               className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-green-400/50"
             />
@@ -136,31 +166,47 @@ function Login({ onLogin, onRegisterClick }: LoginProps) {
 
             <input
               type="password"
+              placeholder="Minimum 6 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-green-400/50"
             />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm text-gray-400">
+              Role
+            </label>
+
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-[#0b0d0c] px-4 py-3 text-sm text-white outline-none focus:border-green-400/50"
+            >
+              <option value="developer">Developer</option>
+              <option value="tester">Tester</option>
+              <option value="manager">Manager</option>
+            </select>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl border border-green-400/30 bg-green-400/10 px-4 py-3 text-sm font-medium text-green-400 transition-all duration-300 hover:border-green-400/60 hover:bg-green-400/20 hover:shadow-[0_0_25px_rgba(34,197,94,0.2)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-xl border border-green-400/30 bg-green-400/10 px-4 py-3 text-sm font-medium text-green-400 transition-all duration-300 hover:border-green-400/60 hover:bg-green-400/20 hover:shadow-[0_0_30px_rgba(34,197,94,0.15)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Creating account..." : "Create Account"}
           </button>
         </form>
 
         <div className="mt-6 text-center text-sm text-gray-500">
-          Don't have an account?{" "}
+          Already have an account?{" "}
           <button
             type="button"
-            onClick={onRegisterClick}
+            onClick={onLoginClick}
             className="font-medium text-green-400 transition hover:text-green-300"
           >
-            Create account
+            Sign in
           </button>
         </div>
       </div>
@@ -168,4 +214,4 @@ function Login({ onLogin, onRegisterClick }: LoginProps) {
   );
 }
 
-export default Login;
+export default Register;
