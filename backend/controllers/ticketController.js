@@ -3,7 +3,6 @@ const Ticket = require("../models/Ticket");
 // =========================
 // CREATE TICKET
 // =========================
-
 const createTicket = async (req, res) => {
   try {
     const { title, description, category, severity } = req.body;
@@ -13,6 +12,10 @@ const createTicket = async (req, res) => {
       description,
       category,
       severity,
+      status: "open",
+      priority: "medium",
+      assignedTo: null,
+      aiAnalysis: null,
     });
 
     res.status(201).json({
@@ -21,6 +24,8 @@ const createTicket = async (req, res) => {
       ticket,
     });
   } catch (error) {
+    console.error("Create ticket error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to create ticket",
@@ -32,7 +37,6 @@ const createTicket = async (req, res) => {
 // =========================
 // GET ALL TICKETS
 // =========================
-
 const getTickets = async (req, res) => {
   try {
     const tickets = await Ticket.find().sort({
@@ -44,6 +48,8 @@ const getTickets = async (req, res) => {
       tickets,
     });
   } catch (error) {
+    console.error("Get tickets error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to fetch tickets",
@@ -55,7 +61,6 @@ const getTickets = async (req, res) => {
 // =========================
 // AI ANALYSIS
 // =========================
-
 const analyzeTicket = async (req, res) => {
   try {
     const { id } = req.params;
@@ -69,10 +74,11 @@ const analyzeTicket = async (req, res) => {
       });
     }
 
-    const text = `${ticket.title} ${ticket.description}`.toLowerCase();
+    const text =
+      `${ticket.title} ${ticket.description}`.toLowerCase();
 
-    // Category detection
-    let category = ticket.category || "bug";
+    // CATEGORY
+    let category = "bug";
 
     if (
       text.includes("security") ||
@@ -93,12 +99,10 @@ const analyzeTicket = async (req, res) => {
       text.includes("performance")
     ) {
       category = "improvement";
-    } else {
-      category = "bug";
     }
 
-    // Severity detection
-    let severity = ticket.severity || "medium";
+    // SEVERITY
+    let severity = "medium";
 
     if (
       text.includes("critical") ||
@@ -120,11 +124,9 @@ const analyzeTicket = async (req, res) => {
       text.includes("small")
     ) {
       severity = "low";
-    } else {
-      severity = "medium";
     }
 
-    // Priority detection
+    // PRIORITY
     let priority = "medium";
 
     if (severity === "critical") {
@@ -135,7 +137,7 @@ const analyzeTicket = async (req, res) => {
       priority = "low";
     }
 
-    // Team detection
+    // TEAM
     let suggestedTeam = "Backend Engineering";
 
     if (
@@ -177,7 +179,7 @@ const analyzeTicket = async (req, res) => {
       suggestedTeam = "Security";
     }
 
-    // Suggested action
+    // SUGGESTED ACTION
     let suggestedAction =
       "Investigate the issue, reproduce the problem and implement an appropriate fix.";
 
@@ -207,7 +209,6 @@ const analyzeTicket = async (req, res) => {
       analyzedAt: new Date(),
     };
 
-    // Save AI analysis to ticket
     ticket.category = category;
     ticket.severity = severity;
     ticket.priority = priority;
@@ -236,7 +237,6 @@ const analyzeTicket = async (req, res) => {
 // =========================
 // UPDATE TICKET
 // =========================
-
 const updateTicket = async (req, res) => {
   try {
     const { id } = req.params;
@@ -245,7 +245,7 @@ const updateTicket = async (req, res) => {
       id,
       req.body,
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       }
     );
@@ -263,6 +263,8 @@ const updateTicket = async (req, res) => {
       ticket,
     });
   } catch (error) {
+    console.error("Update ticket error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to update ticket",
@@ -274,7 +276,6 @@ const updateTicket = async (req, res) => {
 // =========================
 // DELETE TICKET
 // =========================
-
 const deleteTicket = async (req, res) => {
   try {
     const { id } = req.params;
@@ -294,6 +295,8 @@ const deleteTicket = async (req, res) => {
       ticket,
     });
   } catch (error) {
+    console.error("Delete ticket error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to delete ticket",
@@ -302,6 +305,9 @@ const deleteTicket = async (req, res) => {
   }
 };
 
+// =========================
+// EXPORT CONTROLLERS
+// =========================
 module.exports = {
   createTicket,
   getTickets,

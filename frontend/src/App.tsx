@@ -33,11 +33,9 @@ function App() {
   );
 
   const [authMode, setAuthMode] = useState<AuthMode>("login");
-
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedTicket, setSelectedTicket] =
-    useState<Ticket | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -303,6 +301,10 @@ function App() {
     }
   };
 
+  // =========================
+  // DASHBOARD STATISTICS
+  // =========================
+
   const totalTickets = tickets.length;
 
   const openTickets = tickets.filter(
@@ -313,11 +315,20 @@ function App() {
     (ticket) => ticket.status === "in-progress"
   ).length;
 
+  const resolvedTickets = tickets.filter(
+    (ticket) => ticket.status === "resolved"
+  ).length;
+
   const highPriorityTickets = tickets.filter(
     (ticket) =>
       ticket.priority === "high" ||
       ticket.priority === "urgent"
   ).length;
+
+  const resolutionRate =
+    totalTickets > 0
+      ? Math.round((resolvedTickets / totalTickets) * 100)
+      : 0;
 
   if (!isLoggedIn) {
     if (authMode === "login") {
@@ -339,6 +350,7 @@ function App() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-black text-white">
+      {/* Background particles */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         {Array.from({ length: 80 }).map((_, i) => (
           <span
@@ -357,6 +369,8 @@ function App() {
       </div>
 
       <main className="relative z-10 mx-auto max-w-7xl px-6 py-8">
+
+        {/* NAVBAR */}
         <nav className="mb-12 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.035] px-6 py-4 shadow-2xl backdrop-blur-xl">
           <div>
             <h1 className="text-2xl font-bold">
@@ -385,6 +399,7 @@ function App() {
           </div>
         </nav>
 
+        {/* HERO */}
         <section className="mb-10">
           <p className="mb-3 text-sm font-medium uppercase tracking-[0.3em] text-green-400">
             Software Intelligence
@@ -402,27 +417,75 @@ function App() {
           </p>
         </section>
 
-        <section className="mb-10 grid gap-4 md:grid-cols-4">
-          {[
-            ["Total Tickets", totalTickets],
-            ["Open", openTickets],
-            ["In Progress", progressTickets],
-            ["High Priority", highPriorityTickets],
-          ].map(([label, value]) => (
-            <div
-              key={String(label)}
-              className="group rounded-2xl border border-white/10 bg-white/[0.035] p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-green-400/30 hover:bg-white/5 hover:shadow-[0_10px_40px_rgba(34,197,94,0.08)]"
-            >
-              <p className="text-sm text-gray-500">{label}</p>
+        {/* =========================
+            MONITORING DASHBOARD
+        ========================= */}
 
-              <p className="mt-3 text-4xl font-semibold">
-                {value}
+        <section className="mb-10 grid gap-4 md:grid-cols-5">
+
+          <StatCard
+            label="Total Tickets"
+            value={totalTickets}
+          />
+
+          <StatCard
+            label="Open"
+            value={openTickets}
+          />
+
+          <StatCard
+            label="In Progress"
+            value={progressTickets}
+          />
+
+          <StatCard
+            label="Resolved"
+            value={resolvedTickets}
+          />
+
+          <StatCard
+            label="High Priority"
+            value={highPriorityTickets}
+          />
+
+        </section>
+
+        {/* RESOLUTION RATE */}
+
+        <section className="mb-10 rounded-2xl border border-white/10 bg-white/[0.035] p-6 backdrop-blur-xl">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">
+                Resolution Rate
               </p>
 
-              <div className="mt-5 h-0.5 w-8 bg-green-400 transition-all duration-300 group-hover:w-full" />
+              <p className="mt-2 text-3xl font-semibold">
+                {resolutionRate}%
+              </p>
             </div>
-          ))}
+
+            <div className="text-right">
+              <p className="text-xs text-gray-600">
+                Resolved / Total
+              </p>
+
+              <p className="mt-1 text-sm text-green-400">
+                {resolvedTickets} / {totalTickets}
+              </p>
+            </div>
+          </div>
+
+          <div className="h-2 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-green-400 transition-all duration-700"
+              style={{
+                width: `${resolutionRate}%`,
+              }}
+            />
+          </div>
         </section>
+
+        {/* RECENT TICKETS */}
 
         <section>
           <div className="mb-5 flex items-center justify-between">
@@ -508,9 +571,12 @@ function App() {
         </footer>
       </main>
 
+      {/* CREATE TICKET MODAL */}
+
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 backdrop-blur-md">
           <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#080a09]/95 p-7 shadow-[0_0_80px_rgba(34,197,94,0.08)] backdrop-blur-2xl">
+
             <div className="mb-7 flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.25em] text-green-400">
@@ -643,9 +709,12 @@ function App() {
         </div>
       )}
 
+      {/* TICKET DETAILS MODAL */}
+
       {selectedTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-8 backdrop-blur-md">
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-white/10 bg-[#080a09]/95 p-7 shadow-[0_0_100px_rgba(34,197,94,0.08)] backdrop-blur-2xl">
+
             <div className="mb-7 flex items-start justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.25em] text-green-400">
@@ -698,6 +767,8 @@ function App() {
                 value={selectedTicket.status}
               />
             </div>
+
+            {/* AI ANALYSIS */}
 
             <div className="mb-6 rounded-2xl border border-green-400/20 bg-green-400/[0.035] p-6">
               <div className="mb-5 flex items-center justify-between">
@@ -793,6 +864,8 @@ function App() {
               )}
             </div>
 
+            {/* STATUS + TEAM */}
+
             <div className="mb-6 grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm text-gray-400">
@@ -860,6 +933,8 @@ function App() {
               </div>
             </div>
 
+            {/* ACTION BUTTONS */}
+
             <div className="flex justify-between border-t border-white/10 pt-6">
               <button
                 onClick={() =>
@@ -877,12 +952,43 @@ function App() {
                 Close
               </button>
             </div>
+
           </div>
         </div>
       )}
     </div>
   );
 }
+
+/* =========================
+   STAT CARD
+========================= */
+
+function StatCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="group rounded-2xl border border-white/10 bg-white/[0.035] p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-green-400/30 hover:bg-white/5 hover:shadow-[0_10px_40px_rgba(34,197,94,0.08)]">
+      <p className="text-sm text-gray-500">
+        {label}
+      </p>
+
+      <p className="mt-3 text-4xl font-semibold">
+        {value}
+      </p>
+
+      <div className="mt-5 h-0.5 w-8 bg-green-400 transition-all duration-300 group-hover:w-full" />
+    </div>
+  );
+}
+
+/* =========================
+   INFO CARD
+========================= */
 
 function InfoCard({
   label,
@@ -893,7 +999,9 @@ function InfoCard({
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 backdrop-blur-xl">
-      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-xs text-gray-500">
+        {label}
+      </p>
 
       <p className="mt-2 text-sm font-medium text-white">
         {value}
